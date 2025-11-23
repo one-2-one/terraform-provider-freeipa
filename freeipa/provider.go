@@ -26,6 +26,36 @@ func Provider() *schema.Provider {
 				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_PASSWORD", ""),
 				Description: descriptions["password"],
 			},
+			"kerberos_enabled": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KERBEROS_ENABLED", false),
+				Description: descriptions["kerberos_enabled"],
+			},
+			"kerberos_principal": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KERBEROS_PRINCIPAL", ""),
+				Description: descriptions["kerberos_principal"],
+			},
+			"kerberos_realm": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KERBEROS_REALM", ""),
+				Description: descriptions["kerberos_realm"],
+			},
+			"krb5_conf_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KRB5_CONF", "/etc/krb5.conf"),
+				Description: descriptions["krb5_conf_path"],
+			},
+			"keytab_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KEYTAB", "/etc/krb5.keytab"),
+				Description: descriptions["keytab_path"],
+			},
 			"insecure": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -76,6 +106,12 @@ func init() {
 
 		"password": "Password to use for connection",
 
+		"kerberos_enabled":   "Use Kerberos/keytab authentication instead of username/password",
+		"kerberos_principal": "Kerberos principal to use when kerberos_enabled is true",
+		"kerberos_realm":     "Kerberos realm to use when kerberos_enabled is true",
+		"krb5_conf_path":     "Path to krb5.conf to use for Kerberos authentication",
+		"keytab_path":        "Path to keytab file to use for Kerberos authentication",
+
 		"insecure": "Set to true to disable FreeIPA host TLS certificate verification",
 	}
 }
@@ -85,6 +121,11 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		Host:               d.Get("host").(string),
 		Username:           d.Get("username").(string),
 		Password:           d.Get("password").(string),
+		KerberosEnabled:    d.Get("kerberos_enabled").(bool),
+		KerberosPrincipal:  d.Get("kerberos_principal").(string),
+		KerberosRealm:      d.Get("kerberos_realm").(string),
+		Krb5ConfPath:       d.Get("krb5_conf_path").(string),
+		KeytabPath:         d.Get("keytab_path").(string),
 		InsecureSkipVerify: d.Get("insecure").(bool),
 	}, nil
 }
