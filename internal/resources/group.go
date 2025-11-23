@@ -3,10 +3,10 @@ package resources
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/camptocamp/go-freeipa/freeipa"
 	"github.com/camptocamp/terraform-provider-freeipa/internal/provider"
+	"github.com/camptocamp/terraform-provider-freeipa/internal/utils"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -100,14 +100,11 @@ func (r *Group) Create(ctx context.Context, req resource.CreateRequest, resp *re
 	})
 
 	if err != nil {
-		// Workaround for go-freeipa bug when MembermanagerGroup is null
-		if strings.Contains(err.Error(), "MembermanagerGroup") {
+		if utils.IsMembermanagerGroupDecodeError(err) {
 			tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupAdd", map[string]any{
 				"err": err.Error(),
 				"cn":  plan.Name.ValueString(),
 			})
-			// We know IPA created the group (you already confirmed via ipa group-show),
-			// so we proceed with state = plan.
 		} else {
 			resp.Diagnostics.AddError("Failed to create Group", "Reason: "+err.Error())
 			return
@@ -150,13 +147,11 @@ func (r *Group) Read(ctx context.Context, req resource.ReadRequest, resp *resour
 			return
 		}
 
-		// Same go-freeipa decode bug as on Create – ignore, keep last known state
-		if strings.Contains(err.Error(), "MembermanagerGroup") {
+		if utils.IsMembermanagerGroupDecodeError(err) {
 			tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupShow", map[string]any{
 				"err": err.Error(),
 				"cn":  state.Name.ValueString(),
 			})
-			// Don't touch state; just return.
 			return
 		}
 
@@ -218,8 +213,15 @@ func (r *Group) Update(ctx context.Context, req resource.UpdateRequest, resp *re
 			"err": err,
 		})
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to update group", "Reason: "+err.Error())
-			return
+			if utils.IsMembermanagerGroupDecodeError(err) {
+				tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupMod", map[string]any{
+					"err": err.Error(),
+					"cn":  plan.Name.ValueString(),
+				})
+			} else {
+				resp.Diagnostics.AddError("Failed to update group", "Reason: "+err.Error())
+				return
+			}
 		}
 	} else {
 		tflog.Debug(ctx, "Updated DNS record has no effective difference", map[string]any{
@@ -262,8 +264,15 @@ func (r *Group) Delete(ctx context.Context, req resource.DeleteRequest, resp *re
 	if err != nil {
 		var freeipaErr *freeipa.Error
 		if errors.As(err, &freeipaErr) && freeipaErr.Code != freeipa.NotFoundCode {
-			resp.Diagnostics.AddError("Failed to delete group", "Reason: "+err.Error())
-			return
+			if utils.IsMembermanagerGroupDecodeError(err) {
+				tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupDel", map[string]any{
+					"err": err.Error(),
+					"cn":  state.Name.ValueString(),
+				})
+			} else {
+				resp.Diagnostics.AddError("Failed to delete group", "Reason: "+err.Error())
+				return
+			}
 		}
 	}
 

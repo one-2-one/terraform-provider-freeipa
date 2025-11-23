@@ -100,9 +100,7 @@ func (r *Service) Read(ctx context.Context, req resource.ReadRequest, resp *reso
 	args := &freeipa.ServiceShowArgs{
 		Krbcanonicalname: state.KrbHostname.ValueString(),
 	}
-	optArgs := &freeipa.ServiceShowOptionalArgs{
-		All: freeipa.Bool(true),
-	}
+	optArgs := &freeipa.ServiceShowOptionalArgs{}
 
 	tflog.Trace(ctx, "Calling ServiceShow", map[string]any{
 		"args":     args,
@@ -142,9 +140,7 @@ func (r *Service) Update(ctx context.Context, req resource.UpdateRequest, resp *
 	args := &freeipa.ServiceModArgs{
 		Krbcanonicalname: plan.KrbHostname.ValueString(),
 	}
-	optArgs := &freeipa.ServiceModOptionalArgs{
-		All: freeipa.Bool(true),
-	}
+	optArgs := &freeipa.ServiceModOptionalArgs{}
 
 	hasDiff = !plan.KrbHostname.Equal(state.KrbHostname)
 

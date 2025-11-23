@@ -220,9 +220,7 @@ func (r *Host) Read(ctx context.Context, req resource.ReadRequest, resp *resourc
 		Fqdn: state.Fqdn.ValueString(),
 	}
 
-	optArgs := &freeipa.HostShowOptionalArgs{
-		All: freeipa.Bool(true),
-	}
+	optArgs := &freeipa.HostShowOptionalArgs{}
 
 	tflog.Trace(ctx, "Calling HostShow", map[string]any{
 		"args":     args,

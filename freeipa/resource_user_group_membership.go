@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	ipa "github.com/camptocamp/go-freeipa/freeipa"
+	"github.com/camptocamp/terraform-provider-freeipa/internal/utils"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -73,7 +74,11 @@ func resourceFreeIPAUserGroupMembershipCreate(ctx context.Context, d *schema.Res
 
 	_, err = client.GroupAddMember(&args, &optArgs)
 	if err != nil {
-		return diag.Errorf("Error creating freeipa the user group membership: %s", err)
+		if utils.IsMembermanagerGroupDecodeError(err) {
+			log.Printf("[WARN] Ignoring go-freeipa MembermanagerGroup decode error on GroupAddMember: %v", err)
+		} else {
+			return diag.Errorf("Error creating freeipa the user group membership: %s", err)
+		}
 	}
 
 	switch user_id {
@@ -117,6 +122,10 @@ func resourceFreeIPAUserGroupMembershipRead(ctx context.Context, d *schema.Resou
 
 	res, err := client.GroupFind("", &ipa.GroupFindArgs{}, &optArgs)
 	if err != nil {
+		if utils.IsMembermanagerGroupDecodeError(err) {
+			log.Printf("[WARN] Ignoring go-freeipa MembermanagerGroup decode error on GroupFind: %v", err)
+			return nil
+		}
 		return diag.Errorf("Error find freeipa the user group membership: %s", err)
 	}
 
@@ -161,7 +170,11 @@ func resourceFreeIPAUserGroupMembershipDelete(ctx context.Context, d *schema.Res
 
 	_, err = client.GroupRemoveMember(&args, &optArgs)
 	if err != nil {
-		return diag.Errorf("Error delete freeipa the user group membership: %s", err)
+		if utils.IsMembermanagerGroupDecodeError(err) {
+			log.Printf("[WARN] Ignoring go-freeipa MembermanagerGroup decode error on GroupRemoveMember: %v", err)
+		} else {
+			return diag.Errorf("Error delete freeipa the user group membership: %s", err)
+		}
 	}
 
 	d.SetId("")
