@@ -57,7 +57,6 @@ func (p *Provider) Schema(ctx context.Context, req provider.SchemaRequest, resp 
 			},
 			"password": schema.StringAttribute{
 				Optional:    true,
-				Sensitive:   true,
 				Description: "Password to use for connection",
 			},
 			"insecure": schema.BoolAttribute{
