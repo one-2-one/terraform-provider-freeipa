@@ -85,7 +85,6 @@ func (r *Group) Create(ctx context.Context, req resource.CreateRequest, resp *re
 		Gidnumber:   gid,
 		Nonposix:    plan.NonPosix.ValueBoolPointer(),
 		External:    plan.External.ValueBoolPointer(),
-		All:         freeipa.Bool(true),
 	}
 
 	tflog.Trace(ctx, "Calling GroupAdd", map[string]any{
@@ -120,9 +119,7 @@ func (r *Group) Read(ctx context.Context, req resource.ReadRequest, resp *resour
 	args := &freeipa.GroupShowArgs{
 		Cn: state.Name.ValueString(),
 	}
-	optArgs := &freeipa.GroupShowOptionalArgs{
-		All: freeipa.Bool(true),
-	}
+	optArgs := &freeipa.GroupShowOptionalArgs{}
 
 	tflog.Trace(ctx, "Calling GroupShow", map[string]any{
 		"args":     args,
@@ -183,7 +180,6 @@ func (r *Group) Update(ctx context.Context, req resource.UpdateRequest, resp *re
 		Description: plan.Description.ValueStringPointer(),
 		Gidnumber:   gid,
 		External:    plan.External.ValueBoolPointer(),
-		All:         freeipa.Bool(true),
 	}
 
 	hasDiff = !plan.GID.Equal(state.GID) || !plan.Description.Equal(state.Description) ||
