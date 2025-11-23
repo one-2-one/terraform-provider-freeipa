@@ -39,31 +39,77 @@ After building the provider, install it using the Terraform instructions for [in
 Example
 ----------------------
 
+### Password Authentication
+
 ```hcl
-provider freeipa {
-  host = "ipa.example.test"   # or set $FREEIPA_HOST
-  username = "admin"          # or set $FREEIPA_USERNAME
-  password = "P@S5sw0rd"      # or set $FREEIPA_PASSWORD
+provider "freeipa" {
+  host     = "ipa.example.test"   # or set $FREEIPA_HOST
+  username = "admin"              # or set $FREEIPA_USERNAME
+  password = "P@S5sw0rd"          # or set $FREEIPA_PASSWORD
 }
 
-resource freeipa_host "foo" {
-  fqdn = "foo.example.test"
-  description = "This is my foo host"
-  force = true
-  random = true
+resource "freeipa_user" "john" {
+  name       = "jdoe"
+  first_name = "John"
+  last_name  = "Doe"
+  email_address = ["john.doe@example.test"]
 }
 
-resource freeipa_host "bar" {
-  fqdn = "bar.example.test"
-  userpassword = "abcde"
+resource "freeipa_hostgroup" "web_servers" {
+  name        = "web-servers"
+  description = "Web server hosts"
+}
+```
+
+### Keytab Authentication
+
+```hcl
+provider "freeipa" {
+  host               = "ipa.example.test"     # or set $FREEIPA_HOST
+  kerberos_enabled   = true                   # or set $FREEIPA_KERBEROS_ENABLED=true
+  kerberos_principal = "terraform/ipa.example.test@EXAMPLE.TEST"  # or set $FREEIPA_KERBEROS_PRINCIPAL
+  kerberos_realm     = "EXAMPLE.TEST"         # or set $FREEIPA_KERBEROS_REALM
+  keytab_path        = "/etc/krb5.keytab"     # or set $FREEIPA_KEYTAB (default: /etc/krb5.keytab)
+  krb5_conf_path     = "/etc/krb5.conf"       # or set $FREEIPA_KRB5_CONF (default: /etc/krb5.conf)
 }
 
-resource freeipa_dns_record "foo" {
-  dnszoneidnsname = "your.zone.name."
-  idnsname = "foo"
-  records = ["192.168.10.10"]
-  type = "A"
+resource "freeipa_dns_zone" "example" {
+  zone_name = "example.test."
+  
+  dynamic_updates = true
+  default_ttl     = 3600
+  
+  zone_forwarders = [
+    "8.8.8.8",
+    "8.8.4.4",
+  ]
 }
+
+resource "freeipa_sudo_rule" "admin_rule" {
+  name            = "admin-full-access"
+  description     = "Full sudo access for admins"
+  enabled         = true
+  usercategory    = "all"
+  hostcategory    = "all"
+  commandcategory = "all"
+}
+```
+
+### Creating a Keytab for Terraform
+
+To use keytab authentication, create a service principal for Terraform:
+
+```bash
+# On the FreeIPA server
+ipa service-add terraform/ipa.example.test
+
+# Generate a keytab
+ipa-getkeytab -s ipa.example.test \
+  -p terraform/ipa.example.test@EXAMPLE.TEST \
+  -k /path/to/terraform.keytab
+
+# Grant necessary permissions
+ipa role-add-member "User Administrator" --services=terraform/ipa.example.test
 ```
 
 Usage
