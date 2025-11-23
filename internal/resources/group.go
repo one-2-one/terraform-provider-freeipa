@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/camptocamp/go-freeipa/freeipa"
 	"github.com/camptocamp/terraform-provider-freeipa/internal/provider"
@@ -99,8 +100,18 @@ func (r *Group) Create(ctx context.Context, req resource.CreateRequest, resp *re
 	})
 
 	if err != nil {
-		resp.Diagnostics.AddError("Failed to create Group", "Reason: "+err.Error())
-		return
+		// Workaround for go-freeipa bug when MembermanagerGroup is null
+		if strings.Contains(err.Error(), "MembermanagerGroup") {
+			tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupAdd", map[string]any{
+				"err": err.Error(),
+				"cn":  plan.Name.ValueString(),
+			})
+			// We know IPA created the group (you already confirmed via ipa group-show),
+			// so we proceed with state = plan.
+		} else {
+			resp.Diagnostics.AddError("Failed to create Group", "Reason: "+err.Error())
+			return
+		}
 	}
 
 	state = plan
@@ -136,6 +147,16 @@ func (r *Group) Read(ctx context.Context, req resource.ReadRequest, resp *resour
 
 		if errors.As(err, &freeipaErr) && freeipaErr.Code == freeipa.NotFoundCode {
 			resp.State.RemoveResource(ctx)
+			return
+		}
+
+		// Same go-freeipa decode bug as on Create – ignore, keep last known state
+		if strings.Contains(err.Error(), "MembermanagerGroup") {
+			tflog.Warn(ctx, "Ignoring go-freeipa MembermanagerGroup decode error on GroupShow", map[string]any{
+				"err": err.Error(),
+				"cn":  state.Name.ValueString(),
+			})
+			// Don't touch state; just return.
 			return
 		}
 
