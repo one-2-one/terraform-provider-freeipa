@@ -1,7 +1,11 @@
 package freeipa
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,6 +23,7 @@ type Config struct {
 	KerberosRealm      string
 	Krb5ConfPath       string
 	KeytabPath         string
+	KeytabBase64       string
 	InsecureSkipVerify bool
 }
 
@@ -36,21 +41,25 @@ func (c *Config) Client() (*ipa.Client, error) {
 	)
 
 	if c.KerberosEnabled {
+		if c.KeytabPath == "" && c.KeytabBase64 == "" {
+			return nil, fmt.Errorf("kerberos_enabled is true but neither keytab_path nor keytab_base64 is set")
+		}
+
 		krb5ConfFile, err := os.Open(c.Krb5ConfPath)
 		if err != nil {
 			return nil, err
 		}
 		defer krb5ConfFile.Close()
 
-		keytabFile, err := os.Open(c.KeytabPath)
+		keytabReader, err := openKeytabReader(c.KeytabPath, c.KeytabBase64)
 		if err != nil {
 			return nil, err
 		}
-		defer keytabFile.Close()
+		defer keytabReader.Close()
 
 		kerberosOpts := &ipa.KerberosConnectOptions{
 			Krb5ConfigReader: krb5ConfFile,
-			KeytabReader:     keytabFile,
+			KeytabReader:     keytabReader,
 			Username:         c.KerberosPrincipal,
 			Realm:            c.KerberosRealm,
 		}
@@ -66,4 +75,20 @@ func (c *Config) Client() (*ipa.Client, error) {
 	log.Printf("[INFO] FreeIPA Client configured for host: %s", c.Host)
 
 	return client, nil
+}
+
+func openKeytabReader(path, b64 string) (io.ReadCloser, error) {
+	if b64 != "" {
+		decoded, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode keytab_base64: %w", err)
+		}
+		return io.NopCloser(bytes.NewReader(decoded)), nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
 }

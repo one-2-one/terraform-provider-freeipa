@@ -1,8 +1,12 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -37,6 +41,7 @@ type Model struct {
 	KerberosRealm      types.String `tfsdk:"kerberos_realm"`
 	Krb5ConfPath       types.String `tfsdk:"krb5_conf_path"`
 	KeytabPath         types.String `tfsdk:"keytab_path"`
+	KeytabBase64       types.String `tfsdk:"keytab_base64"`
 }
 
 func (p *Provider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -82,6 +87,11 @@ func (p *Provider) Schema(ctx context.Context, req provider.SchemaRequest, resp 
 			"keytab_path": schema.StringAttribute{
 				Optional:    true,
 				Description: "Path to keytab file to use for Kerberos authentication",
+			},
+			"keytab_base64": schema.StringAttribute{
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Base64 encoded keytab content. When set it takes precedence over keytab_path.",
 			},
 		},
 	}
@@ -150,6 +160,11 @@ func (p *Provider) Configure(ctx context.Context, req provider.ConfigureRequest,
 		keytabPath = config.KeytabPath.ValueString()
 	}
 
+	keytabBase64 := os.Getenv("FREEIPA_KEYTAB_BASE64")
+	if !config.KeytabBase64.IsNull() {
+		keytabBase64 = config.KeytabBase64.ValueString()
+	}
+
 	if host == "" {
 		resp.Diagnostics.AddAttributeError(path.Root("host"), "Missing FreeIPA host",
 			`Host is required to establish a connection to FreeIPA.`,
@@ -157,6 +172,12 @@ func (p *Provider) Configure(ctx context.Context, req provider.ConfigureRequest,
 	}
 
 	if kerberosEnabled {
+		if keytabBase64 == "" && keytabPath == "" {
+			resp.Diagnostics.AddAttributeError(path.Root("keytab_path"), "Missing keytab information",
+				`When kerberos_enabled is true you must set either keytab_path or keytab_base64.`,
+			)
+		}
+
 		if kerberosPrincipal == "" {
 			resp.Diagnostics.AddAttributeError(path.Root("kerberos_principal"), "Missing Kerberos principal",
 				`Kerberos principal is required when kerberos_enabled is true.`,
@@ -207,16 +228,16 @@ func (p *Provider) Configure(ctx context.Context, req provider.ConfigureRequest,
 		}
 		defer krb5ConfFile.Close()
 
-		keytabFile, err := os.Open(keytabPath)
+		keytabReader, err := openKeytabReader(keytabPath, keytabBase64)
 		if err != nil {
-			resp.Diagnostics.AddError("Failed to open keytab file", "Reason: "+err.Error())
+			resp.Diagnostics.AddError("Failed to load keytab", "Reason: "+err.Error())
 			return
 		}
-		defer keytabFile.Close()
+		defer keytabReader.Close()
 
 		kerberosOpts := &freeipa.KerberosConnectOptions{
 			Krb5ConfigReader: krb5ConfFile,
-			KeytabReader:     keytabFile,
+			KeytabReader:     keytabReader,
 			Username:         kerberosPrincipal,
 			Realm:            kerberosRealm,
 		}
@@ -281,4 +302,24 @@ func NewFactory(ds []func(p *Provider) datasource.DataSource, rs []func(p *Provi
 
 		return p
 	}
+}
+
+func openKeytabReader(path, b64 string) (io.ReadCloser, error) {
+	if b64 != "" {
+		decoded, err := base64.StdEncoding.DecodeString(b64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode keytab_base64: %w", err)
+		}
+		return io.NopCloser(bytes.NewReader(decoded)), nil
+	}
+
+	if path == "" {
+		return nil, fmt.Errorf("keytab_path is empty")
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
 }

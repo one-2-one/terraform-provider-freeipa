@@ -56,6 +56,13 @@ func Provider() *schema.Provider {
 				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KEYTAB", "/etc/krb5.keytab"),
 				Description: descriptions["keytab_path"],
 			},
+			"keytab_base64": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				DefaultFunc: schema.EnvDefaultFunc("FREEIPA_KEYTAB_BASE64", ""),
+				Description: descriptions["keytab_base64"],
+			},
 			"insecure": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -111,6 +118,7 @@ func init() {
 		"kerberos_realm":     "Kerberos realm to use when kerberos_enabled is true",
 		"krb5_conf_path":     "Path to krb5.conf to use for Kerberos authentication",
 		"keytab_path":        "Path to keytab file to use for Kerberos authentication",
+		"keytab_base64":      "Base64 encoded keytab content. When set it takes precedence over keytab_path.",
 
 		"insecure": "Set to true to disable FreeIPA host TLS certificate verification",
 	}
@@ -126,6 +134,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		KerberosRealm:      d.Get("kerberos_realm").(string),
 		Krb5ConfPath:       d.Get("krb5_conf_path").(string),
 		KeytabPath:         d.Get("keytab_path").(string),
+		KeytabBase64:       d.Get("keytab_base64").(string),
 		InsecureSkipVerify: d.Get("insecure").(bool),
 	}, nil
 }
