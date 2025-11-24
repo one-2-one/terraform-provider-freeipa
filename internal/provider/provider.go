@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/camptocamp/go-freeipa/freeipa"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -306,7 +307,8 @@ func NewFactory(ds []func(p *Provider) datasource.DataSource, rs []func(p *Provi
 
 func openKeytabReader(path, b64 string) (io.ReadCloser, error) {
 	if b64 != "" {
-		decoded, err := base64.StdEncoding.DecodeString(b64)
+		clean := compactBase64Whitespace(b64)
+		decoded, err := base64.StdEncoding.DecodeString(clean)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode keytab_base64: %w", err)
 		}
@@ -322,4 +324,24 @@ func openKeytabReader(path, b64 string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+func compactBase64Whitespace(s string) string {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\n', '\r', '\t', '\v', '\f', ' ':
+			var b strings.Builder
+			b.Grow(len(s))
+			for j := 0; j < len(s); j++ {
+				ch := s[j]
+				switch ch {
+				case '\n', '\r', '\t', '\v', '\f', ' ':
+					continue
+				}
+				b.WriteByte(ch)
+			}
+			return b.String()
+		}
+	}
+	return s
 }

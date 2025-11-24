@@ -116,6 +116,17 @@ Usage
 ----------------------
 
 
+Troubleshooting
+---------------
+
+If you encounter errors with keytab authentication, especially the "illegal base64 data" error, see the [Troubleshooting Guide](docs/TROUBLESHOOTING.md) for detailed solutions.
+
+Common issues:
+- **"illegal base64 data at input byte 4"**: Usually caused by data URI prefixes or invalid base64 format. Ensure your `keytab_base64` is a plain base64 string without any prefixes.
+- **Keytab not found**: Verify the keytab file path is correct and the file exists.
+- **Authentication failures**: Ensure the keytab matches the principal specified in `kerberos_principal`.
+
+
 Import
 ------
 
